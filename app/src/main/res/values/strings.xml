@@ -2,6 +2,6 @@
     <string name="app_name">CPMapTest</string>
     <string name="alert_btn_yes">Yes</string>
     <string name="alert_btn_no">No</string>
-    <string name="location_toast_alert">You won\'t be localise, restart application to get localise</string>
+    <string name="location_toast_alert">You won\'t be localise, please restart the application to get localise</string>
     <string name="alert_dial_mess">Location is necessary to use the app. Would you like to allow location?</string>
 </resources>

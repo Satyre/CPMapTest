@@ -11,21 +11,30 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
+import com.mapbox.mapboxsdk.annotations.MarkerOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.camera.CameraUpdateFactory;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
+import com.mapbox.services.android.ui.geocoder.GeocoderAutoCompleteView;
+import com.mapbox.services.api.geocoding.v5.GeocodingCriteria;
+import com.mapbox.services.api.geocoding.v5.models.CarmenFeature;
+import com.mapbox.services.commons.models.Position;
 
 public class MainActivity extends AppCompatActivity {
 
-    private final static String MAPBOX_KEY = "pk.eyJ1Ijoic2F0eXJlIiwiYSI6ImNqNGVpbW96aDE1N2UzM2x2aDRra28zeDUifQ.hZ5xMiJnOkqU2QR-muCiBQ";
+    public static final String LOG_TAG = "MAIN_ACTIVITY";
     public static final int ACCESS_LOCATION = 1;
+    private final static String MAPBOX_KEY = "pk.eyJ1Ijoic2F0eXJlIiwiYSI6ImNqNGVpbW96aDE1N2UzM2x2aDRra28zeDUifQ.hZ5xMiJnOkqU2QR-muCiBQ";
     private MapView mapView;
+    private MapboxMap map;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
         checkLocationPermission();
-        setMapView();
+        setMapViewAndAutoCompleteView();
 
     }
 
@@ -64,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
             case ACCESS_LOCATION: {
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    setMapView();
+                    setMapViewAndAutoCompleteView();
 
                 } else {
 
@@ -79,7 +88,8 @@ public class MainActivity extends AppCompatActivity {
                                 public void onClick(DialogInterface dialog, int id) {
                                     dialog.cancel();
                                     checkLocationPermission();
-                                }});
+                                }
+                            });
 
                     builder.setNegativeButton(
                             R.string.alert_btn_no,
@@ -87,7 +97,8 @@ public class MainActivity extends AppCompatActivity {
                                 public void onClick(DialogInterface dialog, int id) {
                                     Toast.makeText(MainActivity.this, R.string.location_toast_alert, Toast.LENGTH_LONG).show();
                                     dialog.cancel();
-                                }});
+                                }
+                            });
 
                     builder.create().show();
                 }
@@ -96,10 +107,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //set Mapview parameters like : showing location and camera position
-    private void setMapView() {
+    private void setMapViewAndAutoCompleteView() {
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(final MapboxMap mapboxMap) {
+                map = mapboxMap;
                 mapboxMap.setMyLocationEnabled(true);
 
                 mapboxMap.setOnMyLocationChangeListener(new MapboxMap.OnMyLocationChangeListener() {
@@ -112,10 +124,28 @@ public class MainActivity extends AppCompatActivity {
                                     .build();
 
                             mapboxMap.animateCamera(CameraUpdateFactory
-                                    .newCameraPosition(position), 4000); // move camera on position in desire time (ms);
+                                    .newCameraPosition(position), 4000); // move camera on position in desire time (ms)
                         }
+                        // Set up autocomplete widget
+                        GeocoderAutoCompleteView autocomplete = (GeocoderAutoCompleteView) findViewById(R.id.autoCompleteView);
+                        autocomplete.setAccessToken(Mapbox.getAccessToken());
+                        autocomplete.setType(GeocodingCriteria.TYPE_ADDRESS);
+                        autocomplete.setCountry("FR");
+                        if (location != null)
+                            autocomplete.setProximity(Position.fromCoordinates(location.getLongitude(), location.getLatitude()));
+                        autocomplete.setOnFeatureListener(new GeocoderAutoCompleteView.OnFeatureListener() {
+                            @Override
+                            public void onFeatureClick(CarmenFeature feature) {
+                                hideOnScreenKeyboard();
+                                Position position = feature.asPosition();
+                                updateMap(position.getLatitude(), position.getLongitude(), feature.getPlaceName());
+                            }
+                        });
                     }
+
                 });
+
+
             }
         });
     }
@@ -160,6 +190,33 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
+    }
+
+    private void hideOnScreenKeyboard() {
+        try {
+            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (getCurrentFocus() != null) {
+                imm.hideSoftInputFromWindow(this.getCurrentFocus().getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
+            }
+        } catch (Exception exception) {
+            throw new RuntimeException(exception);
+        }
+
+    }
+
+    private void updateMap(double latitude, double longitude, String address) {
+        // Build marker
+        map.addMarker(new MarkerOptions()
+                .position(new LatLng(latitude, longitude))
+                .title(address));
+
+        Log.d(LOG_TAG, "address : " + address);
+        // Animate camera to geocoder result location
+        CameraPosition cameraPosition = new CameraPosition.Builder()
+                .target(new LatLng(latitude, longitude))
+                .zoom(15)
+                .build();
+        map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 5000, null);
     }
 }
 

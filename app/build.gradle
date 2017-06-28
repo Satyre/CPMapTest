@@ -19,6 +19,12 @@ android {
     }
 }
 
+repositories {
+    mavenCentral()
+    maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
+}
+
+
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
@@ -30,4 +36,10 @@ dependencies {
     compile ('com.mapbox.mapboxsdk:mapbox-android-sdk:5.0.2@aar'){
         transitive=true
     }
+    compile ('com.mapbox.mapboxsdk:mapbox-android-geocoder:1.0.0@aar'){
+        transitive=true
+    }
+    compile 'com.mapbox.mapboxsdk:mapbox-android-services:2.2.0-SNAPSHOT'
+    compile 'com.mapbox.mapboxsdk:mapbox-android-ui:2.1.2'
+
 }
