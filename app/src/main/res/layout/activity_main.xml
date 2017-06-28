@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -8,12 +7,12 @@
 
     <com.mapbox.mapboxsdk.maps.MapView
         android:id="@+id/mapView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        mapbox_styleUrl="@string/mapbox_style_mapbox_streets"
         mapbox_myLocation="true"
+        mapbox_myLocationDrawable="@drawable/mapbox_mylocation_icon_default"
         mapbox_myLocationTintColor="@color/mapbox_blue"
-        mapbox_myLocationDrawable="@drawable/mapbox_mylocation_icon_default"/>
+        mapbox_styleUrl="@string/mapbox_style_mapbox_streets"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <com.mapbox.services.android.ui.geocoder.GeocoderAutoCompleteView
         android:id="@+id/autoCompleteView"
@@ -23,14 +22,19 @@
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
         android:layout_marginEnd="70dp"
+        android:layout_marginLeft="18dp"
         android:layout_marginRight="70dp"
         android:layout_marginStart="18dp"
-        android:layout_marginLeft="18dp"
         android:layout_marginTop="14dp"
         android:background="@android:color/white"
         android:elevation="12dp"
+        android:ellipsize="none"
+        android:hint="@string/select_pick_up_address"
+        android:inputType="textMultiLine"
+        android:lines="3"
+        android:maxLines="10"
+        android:minLines="2"
         android:padding="10dp"
-        android:maxLines="1"
-        android:textColor="@android:color/black"
-        />
+        android:scrollHorizontally="false"
+        android:textColor="@android:color/black" />
 </RelativeLayout>

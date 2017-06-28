@@ -3,7 +3,6 @@ package com.satyre.cpmaptest;
 import android.Manifest;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
-import android.graphics.PointF;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
@@ -14,11 +13,9 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
-import com.google.gson.JsonElement;
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.MarkerOptions;
 import com.mapbox.mapboxsdk.annotations.MarkerView;
@@ -32,23 +29,21 @@ import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 import com.mapbox.services.android.ui.geocoder.GeocoderAutoCompleteView;
 import com.mapbox.services.api.geocoding.v5.GeocodingCriteria;
 import com.mapbox.services.api.geocoding.v5.models.CarmenFeature;
-import com.mapbox.services.commons.geojson.Feature;
 import com.mapbox.services.commons.models.Position;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
     public static final String LOG_TAG = "MAIN_ACTIVITY";
     public static final int ACCESS_LOCATION = 1;
     private final static String MAPBOX_KEY = "pk.eyJ1Ijoic2F0eXJlIiwiYSI6ImNqNGVpbW96aDE1N2UzM2x2aDRra28zeDUifQ.hZ5xMiJnOkqU2QR-muCiBQ";
+    GeocoderAutoCompleteView autocompleteView;
     private MapView mapView;
     private MapboxMap map;
-    private MarkerView lastMarkerAdd;
-    GeocoderAutoCompleteView autocomplete;
+    private MarkerView arrivalMarker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -140,14 +135,15 @@ public class MainActivity extends AppCompatActivity {
                             mapboxMap.animateCamera(CameraUpdateFactory
                                     .newCameraPosition(position), 4000); // move camera on position in desire time (ms)
                         }
-                        // Set up autocomplete widget
-                        autocomplete = (GeocoderAutoCompleteView) findViewById(R.id.autoCompleteView);
-                        autocomplete.setAccessToken(Mapbox.getAccessToken());
-                        autocomplete.setType(GeocodingCriteria.TYPE_ADDRESS);
-                        autocomplete.setCountry("FR");
+
+                        // Set up autocompleteView widget
+                        autocompleteView = (GeocoderAutoCompleteView) findViewById(R.id.autoCompleteView);
+                        autocompleteView.setAccessToken(Mapbox.getAccessToken());
+                        autocompleteView.setType(GeocodingCriteria.TYPE_ADDRESS);
+                        autocompleteView.setCountry(getString(R.string.fr));
                         if (location != null)
-                            autocomplete.setProximity(Position.fromCoordinates(location.getLongitude(), location.getLatitude()));
-                        autocomplete.setOnFeatureListener(new GeocoderAutoCompleteView.OnFeatureListener() {
+                            autocompleteView.setProximity(Position.fromCoordinates(location.getLongitude(), location.getLatitude()));
+                        autocompleteView.setOnFeatureListener(new GeocoderAutoCompleteView.OnFeatureListener() {
                             @Override
                             public void onFeatureClick(CarmenFeature feature) {
                                 hideOnScreenKeyboard();
@@ -162,6 +158,70 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    private void updateMap(double latitude, double longitude, String address) {
+        final LatLng pinLocation = new LatLng(latitude, longitude);
+
+        //Add Pick up marker and force focus on it
+        if (arrivalMarker == null) {
+            // Build marker
+            map.addMarker(new MarkerOptions()
+                    .position(pinLocation)
+                    .title(getString(R.string.pick_up))
+                    .snippet(address));
+
+            // Animate camera to geocoder result location
+            CameraPosition cameraPosition = new CameraPosition.Builder()
+                    .target(pinLocation)
+                    .zoom(15)
+                    .build();
+            map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 5000, null);
+
+            map.setOnCameraChangeListener(new MapboxMap.OnCameraChangeListener() {
+                @Override
+                public void onCameraChange(CameraPosition position) {
+                    CameraPosition cameraPosition = new CameraPosition.Builder()
+                            .target(pinLocation)
+                            .build();
+                    map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 0, null);
+                }
+            });
+            autocompleteView.setHint(R.string.select_drop_off);
+        }
+        onMapclick();
+    }
+
+    private void onMapclick() {
+        map.setOnMapClickListener(new MapboxMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(@NonNull LatLng point) {
+
+                //Add Arrival marker or update position
+                if (arrivalMarker != null)
+                    arrivalMarker.setPosition(point);
+                else
+                    arrivalMarker = map.addMarker(new MarkerViewOptions()
+                            .position(point)
+                            .title(getString(R.string.arrival)));
+
+                //Get address from marker location
+                Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
+                try {
+                    List<Address> listAddresses = geocoder.getFromLocation(point.getLatitude(), point.getLongitude(), 1);
+                    if (null != listAddresses && listAddresses.size() > 0) {
+                        String addressLine = listAddresses.get(0).getAddressLine(0);
+                        String zipcode = listAddresses.get(0).getPostalCode();
+                        String city = listAddresses.get(0).getLocality();
+                        autocompleteView.setText(addressLine + " " + zipcode + " " + city);
+                        arrivalMarker.setSnippet(addressLine + " " + zipcode + " " + city);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
 
     @Override
     protected void onStart() {
@@ -215,66 +275,6 @@ public class MainActivity extends AppCompatActivity {
             throw new RuntimeException(exception);
         }
 
-    }
-
-    private void updateMap(double latitude, double longitude, String address) {
-        final LatLng pinLocation = new LatLng(latitude, longitude);
-
-        if(lastMarkerAdd == null) {
-            // Build marker
-            map.addMarker(new MarkerOptions()
-                    .position(pinLocation)
-                    .title("Pick up :")
-                    .snippet(address));
-
-            Log.d(LOG_TAG, "address : " + address);
-            // Animate camera to geocoder result location
-            CameraPosition cameraPosition = new CameraPosition.Builder()
-                    .target(pinLocation)
-                    .zoom(15)
-                    .build();
-            map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 5000, null);
-
-            map.setOnCameraChangeListener(new MapboxMap.OnCameraChangeListener() {
-                @Override
-                public void onCameraChange(CameraPosition position) {
-                    CameraPosition cameraPosition = new CameraPosition.Builder()
-                            .target(pinLocation)
-                            .build();
-                    map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 0, null);
-                }
-            });
-        }
-        map.setOnMapClickListener(new MapboxMap.OnMapClickListener() {
-            @Override
-            public void onMapClick(@NonNull LatLng point) {
-                if (lastMarkerAdd != null)
-                    lastMarkerAdd.setPosition(point);
-                else
-                    lastMarkerAdd = map.addMarker(new MarkerViewOptions()
-                            .position(point)
-                            .title("Arrival :"));
-
-
-
-
-
-
-                Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
-                try {
-                    List<Address> listAddresses = geocoder.getFromLocation(point.getLatitude(), point.getLongitude(), 1);
-                    if(null!=listAddresses&&listAddresses.size()>0){
-                        String addressLine = listAddresses.get(0).getAddressLine(0);
-                        String zipcode = listAddresses.get(0).getPostalCode();
-                        String city = listAddresses.get(0).getLocality();
-                        autocomplete.setText(addressLine + " " + zipcode + " " + city);
-                        lastMarkerAdd.setSnippet(addressLine + " " + zipcode + " " + city);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
     }
 }
 
