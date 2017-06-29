@@ -4,11 +4,19 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal">
 
+    <ImageView
+        android:id="@+id/history_img"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_gravity="center"
+        android:layout_margin="10dp"
+        android:src="@drawable/ic_history_48px"/>
+
     <android.support.v7.widget.AppCompatTextView
         android:id="@+id/drawer_cell_tv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="10dp"
+        android:layout_gravity="center"
         android:textSize="12sp"
         />
 </LinearLayout>

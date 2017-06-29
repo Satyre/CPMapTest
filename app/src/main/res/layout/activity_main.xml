@@ -24,7 +24,7 @@
         <RelativeLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:background="@android:color/white">
+            android:background="@android:color/holo_blue_light">
 
             <TextView
                 android:id="@+id/historyTitle"
@@ -35,14 +35,16 @@
                 android:text="@string/address_history"
                 android:textColor="@android:color/black"
                 android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:background="@android:color/holo_blue_light"/>
 
             <ListView
                 android:id="@+id/historyList"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_below="@+id/historyTitle"
-                android:layout_marginTop="20dp" />
+                android:layout_marginTop="20dp"
+                android:background="@android:color/white"/>
         </RelativeLayout>
     </android.support.design.widget.NavigationView>
 

@@ -11,6 +11,9 @@ import android.util.Log;
 import android.view.inputmethod.InputMethodManager;
 
 import com.mapbox.mapboxsdk.Mapbox;
+import com.mapbox.mapboxsdk.annotations.Icon;
+import com.mapbox.mapboxsdk.annotations.IconFactory;
+import com.mapbox.mapboxsdk.annotations.Marker;
 import com.mapbox.mapboxsdk.annotations.MarkerView;
 import com.mapbox.mapboxsdk.annotations.MarkerViewOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
@@ -48,12 +51,18 @@ public abstract class MapBoxClass extends AppCompatActivity {
 
     public void addMarker(final LatLng pinLocation, String address) {
         //Add Pick up marker and force focus on it
+        IconFactory iconFactory = IconFactory.getInstance(MapBoxClass.this);
+
         if (pickupMarker == null) {
+
+            Icon iconPickup = iconFactory.fromResource(R.drawable.pickup_img);
+
             // Build pickupMarker
             pickupMarker = map.addMarker(new MarkerViewOptions()
                     .position(pinLocation)
                     .title(getString(R.string.pick_up))
-                    .snippet(address));
+                    .snippet(address)
+                    .icon(iconPickup));
 
             // Animate camera to geocoder result location
             CameraPosition cameraPosition = new CameraPosition.Builder()
@@ -78,11 +87,22 @@ public abstract class MapBoxClass extends AppCompatActivity {
             if (arrivalMarker != null) {
                 arrivalMarker.setPosition(pinLocation);
                 arrivalMarker.setSnippet(address);
-            } else
+            } else {
+                Icon iconArrival = iconFactory.fromResource(R.drawable.flag_arrival);
                 arrivalMarker = map.addMarker(new MarkerViewOptions()
                         .position(pinLocation)
-                        .title(getString(R.string.arrival)));
+                        .title(getString(R.string.arrival))
+                        .icon(iconArrival));
+            }
+
         }
+
+        map.setOnMarkerClickListener(new MapboxMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(@NonNull Marker marker) {
+                return false;
+            }
+        });
         addAddressToDB(address, pinLocation);
     }
 
