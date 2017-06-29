@@ -1,6 +1,5 @@
 package com.satyre.cpmaptest;
 
-import android.content.ClipData;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;

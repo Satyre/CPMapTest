@@ -1,6 +1,5 @@
 package com.satyre.cpmaptest;
 
-import com.orm.SugarRecord;
 import com.orm.dsl.Table;
 import com.orm.dsl.Unique;
 

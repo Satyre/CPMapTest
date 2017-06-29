@@ -21,5 +21,5 @@
 
     </android.support.design.widget.AppBarLayout>
 
-   <include layout="@layout/map_main"/>
+    <include layout="@layout/map_main" />
 </android.support.design.widget.CoordinatorLayout>

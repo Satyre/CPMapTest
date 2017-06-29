@@ -25,7 +25,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
-import com.mapbox.mapboxsdk.annotations.MarkerOptions;
 import com.mapbox.mapboxsdk.annotations.MarkerView;
 import com.mapbox.mapboxsdk.annotations.MarkerViewOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
@@ -52,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
     GeocoderAutoCompleteView autocompleteView;
     private MapView mapView;
     private MapboxMap map;
-    private MarkerView arrivalMarker;
+    private MarkerView pickupMarker, arrivalMarker;
     private GenericAdapter<CacheAddress> listAdapter;
 
     @Override
@@ -64,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
+        //Set toolbar and drawer
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
@@ -73,16 +73,14 @@ public class MainActivity extends AppCompatActivity {
         drawer.addDrawerListener(toggle);
         toggle.syncState();
 
-
+        //Set Map
         mapView = (MapView) findViewById(R.id.mapView);
-
         mapView.onCreate(savedInstanceState);
         checkLocationPermission();
         setMapViewAndAutoCompleteView();
 
-
+        //Set history list
         List<CacheAddress> CacheAddresses = SugarRecord.listAll(CacheAddress.class);
-
 
         ListView drawerListView = (ListView) findViewById(R.id.historyList);
         listAdapter = new GenericAdapter<>(MainActivity.this, R.layout.drawer_cell, CacheAddresses, new GenericAdapter.AdapterListener<CacheAddress>() {
@@ -95,10 +93,11 @@ public class MainActivity extends AppCompatActivity {
                 view.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        map.addMarker(new MarkerOptions()
-                                .position(new LatLng(object.getLatitude(), object.getLongitude()))
-                                .title(getString(R.string.pick_up))
-                                .snippet(object.getDisplayTxt()));
+                        //remove lock on markerPickup
+                        map.setOnCameraChangeListener(null);
+
+                        //Add marker from DB
+                        addMarker(new LatLng(object.getLatitude(), object.getLongitude()), object.getDisplayTxt());
 
                         // Animate camera to geocoder result location
                         CameraPosition cameraPosition = new CameraPosition.Builder()
@@ -203,7 +202,6 @@ public class MainActivity extends AppCompatActivity {
                                 hideOnScreenKeyboard();
                                 Position position = feature.asPosition();
                                 updateMap(position.getLatitude(), position.getLongitude(), feature.getPlaceName());
-                                addAddressToDB(feature.getPlaceName(), new LatLng(location.getLatitude(), location.getLongitude()));
                             }
                         });
                     }
@@ -216,11 +214,36 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateMap(double latitude, double longitude, String address) {
         final LatLng pinLocation = new LatLng(latitude, longitude);
+        addMarker(pinLocation, address);
+        onMapclick();
+    }
 
+    private void onMapclick() {
+        map.setOnMapClickListener(new MapboxMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(@NonNull LatLng point) {
+                //Get address from marker location
+                Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
+                try {
+                    List<Address> listAddresses = geocoder.getFromLocation(point.getLatitude(), point.getLongitude(), 1);
+                    if (null != listAddresses && listAddresses.size() > 0) {
+                        String address = listAddresses.get(0).getAddressLine(0) + " "
+                                + listAddresses.get(0).getPostalCode() + " " + listAddresses.get(0).getLocality();
+                        addMarker(point, address);
+                        autocompleteView.setText(address);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
+    private void addMarker(final LatLng pinLocation, String address) {
         //Add Pick up marker and force focus on it
-        if (arrivalMarker == null) {
-            // Build marker
-            map.addMarker(new MarkerOptions()
+        if (pickupMarker == null) {
+            // Build pickupMarker
+            pickupMarker = map.addMarker(new MarkerViewOptions()
                     .position(pinLocation)
                     .title(getString(R.string.pick_up))
                     .snippet(address));
@@ -232,6 +255,7 @@ public class MainActivity extends AppCompatActivity {
                     .build();
             map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 5000, null);
 
+            //Lock camera center on pickupMarker
             map.setOnCameraChangeListener(new MapboxMap.OnCameraChangeListener() {
                 @Override
                 public void onCameraChange(CameraPosition position) {
@@ -242,51 +266,30 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
             autocompleteView.setHint(R.string.select_drop_off);
+        } else {
+            //Add arrivalMarker or update is position
+            if (arrivalMarker != null) {
+                arrivalMarker.setPosition(pinLocation);
+                arrivalMarker.setSnippet(address);
+            } else
+                arrivalMarker = map.addMarker(new MarkerViewOptions()
+                        .position(pinLocation)
+                        .title(getString(R.string.arrival)));
         }
-        onMapclick();
+        addAddressToDB(address, pinLocation);
     }
-
-    private void onMapclick() {
-        map.setOnMapClickListener(new MapboxMap.OnMapClickListener() {
-            @Override
-            public void onMapClick(@NonNull LatLng point) {
-
-                //Add Arrival marker or update position
-                if (arrivalMarker != null)
-                    arrivalMarker.setPosition(point);
-                else
-                    arrivalMarker = map.addMarker(new MarkerViewOptions()
-                            .position(point)
-                            .title(getString(R.string.arrival)));
-
-                //Get address from marker location
-                Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
-                try {
-                    List<Address> listAddresses = geocoder.getFromLocation(point.getLatitude(), point.getLongitude(), 1);
-                    if (null != listAddresses && listAddresses.size() > 0) {
-                        String address = listAddresses.get(0).getAddressLine(0) + " "
-                                + listAddresses.get(0).getPostalCode() + " " + listAddresses.get(0).getLocality();
-                        autocompleteView.setText(address);
-                        arrivalMarker.setSnippet(address);
-                        addAddressToDB(address, point);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-    }
-
 
     private void addAddressToDB(String addressTxt, LatLng latLng) {
+        //Remove previous address
         List<CacheAddress> cacheAddresses = SugarRecord.listAll(CacheAddress.class);
-        if (cacheAddresses.size() >= 15) {
-            listAdapter.remove(SugarRecord.first(CacheAddress.class));
+        if (cacheAddresses.size() >= 14) {
+            listAdapter.clear();
+            cacheAddresses.remove(SugarRecord.first(CacheAddress.class));
+            listAdapter.addAll(cacheAddresses);
             listAdapter.notifyDataSetChanged();
             SugarRecord.delete(SugarRecord.first(CacheAddress.class));
 
-            Log.d(LOG_TAG, "first item os : " + SugarRecord.first(CacheAddress.class).getDisplayTxt());
-            Log.d(LOG_TAG, "nb adresses" + listAdapter.getCount());
+            Log.d(LOG_TAG, "first item : " + SugarRecord.first(CacheAddress.class).getDisplayTxt());
         }
 
         //Add address to DB
