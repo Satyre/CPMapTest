@@ -11,9 +11,17 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
+import android.util.Log;
+import android.view.View;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
@@ -30,6 +38,7 @@ import com.mapbox.services.android.ui.geocoder.GeocoderAutoCompleteView;
 import com.mapbox.services.api.geocoding.v5.GeocodingCriteria;
 import com.mapbox.services.api.geocoding.v5.models.CarmenFeature;
 import com.mapbox.services.commons.models.Position;
+import com.orm.SugarRecord;
 
 import java.io.IOException;
 import java.util.List;
@@ -44,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     private MapView mapView;
     private MapboxMap map;
     private MarkerView arrivalMarker;
+    private GenericAdapter<CacheAddress> listAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,11 +64,54 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawerLayout);
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+                this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
+        drawer.addDrawerListener(toggle);
+        toggle.syncState();
+
+
         mapView = (MapView) findViewById(R.id.mapView);
+
         mapView.onCreate(savedInstanceState);
         checkLocationPermission();
         setMapViewAndAutoCompleteView();
 
+
+        List<CacheAddress> CacheAddresses = SugarRecord.listAll(CacheAddress.class);
+
+
+        ListView drawerListView = (ListView) findViewById(R.id.historyList);
+        listAdapter = new GenericAdapter<>(MainActivity.this, R.layout.drawer_cell, CacheAddresses, new GenericAdapter.AdapterListener<CacheAddress>() {
+
+            @Override
+            public void setView(View view, final CacheAddress object) {
+                TextView tv = view.findViewById(R.id.drawer_cell_tv);
+
+                tv.setText(object.getDisplayTxt());
+                view.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        map.addMarker(new MarkerOptions()
+                                .position(new LatLng(object.getLatitude(), object.getLongitude()))
+                                .title(getString(R.string.pick_up))
+                                .snippet(object.getDisplayTxt()));
+
+                        // Animate camera to geocoder result location
+                        CameraPosition cameraPosition = new CameraPosition.Builder()
+                                .target(new LatLng(object.getLatitude(), object.getLongitude()))
+                                .zoom(15)
+                                .build();
+                        map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 5000, null);
+                    }
+                });
+            }
+        });
+        drawerListView.setAdapter(listAdapter);
+        listAdapter.notifyDataSetChanged();
     }
 
     //check and grant location permissions
@@ -125,7 +178,7 @@ public class MainActivity extends AppCompatActivity {
 
                 mapboxMap.setOnMyLocationChangeListener(new MapboxMap.OnMyLocationChangeListener() {
                     @Override
-                    public void onMyLocationChange(@Nullable Location location) {
+                    public void onMyLocationChange(@Nullable final Location location) {
                         if (location != null) {
                             CameraPosition position = new CameraPosition.Builder()
                                     .target(new LatLng(location.getLatitude(), location.getLongitude())) // Sets the new camera position
@@ -146,9 +199,11 @@ public class MainActivity extends AppCompatActivity {
                         autocompleteView.setOnFeatureListener(new GeocoderAutoCompleteView.OnFeatureListener() {
                             @Override
                             public void onFeatureClick(CarmenFeature feature) {
+                                //On feature item click
                                 hideOnScreenKeyboard();
                                 Position position = feature.asPosition();
                                 updateMap(position.getLatitude(), position.getLongitude(), feature.getPlaceName());
+                                addAddressToDB(feature.getPlaceName(), new LatLng(location.getLatitude(), location.getLongitude()));
                             }
                         });
                     }
@@ -209,11 +264,11 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     List<Address> listAddresses = geocoder.getFromLocation(point.getLatitude(), point.getLongitude(), 1);
                     if (null != listAddresses && listAddresses.size() > 0) {
-                        String addressLine = listAddresses.get(0).getAddressLine(0);
-                        String zipcode = listAddresses.get(0).getPostalCode();
-                        String city = listAddresses.get(0).getLocality();
-                        autocompleteView.setText(addressLine + " " + zipcode + " " + city);
-                        arrivalMarker.setSnippet(addressLine + " " + zipcode + " " + city);
+                        String address = listAddresses.get(0).getAddressLine(0) + " "
+                                + listAddresses.get(0).getPostalCode() + " " + listAddresses.get(0).getLocality();
+                        autocompleteView.setText(address);
+                        arrivalMarker.setSnippet(address);
+                        addAddressToDB(address, point);
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -222,6 +277,26 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+
+    private void addAddressToDB(String addressTxt, LatLng latLng) {
+        List<CacheAddress> cacheAddresses = SugarRecord.listAll(CacheAddress.class);
+        if (cacheAddresses.size() >= 15) {
+            listAdapter.remove(SugarRecord.first(CacheAddress.class));
+            listAdapter.notifyDataSetChanged();
+            SugarRecord.delete(SugarRecord.first(CacheAddress.class));
+
+            Log.d(LOG_TAG, "first item os : " + SugarRecord.first(CacheAddress.class).getDisplayTxt());
+            Log.d(LOG_TAG, "nb adresses" + listAdapter.getCount());
+        }
+
+        //Add address to DB
+        CacheAddress address = new CacheAddress(addressTxt, latLng.getLatitude(), latLng.getLongitude());
+        listAdapter.add(address);
+        listAdapter.notifyDataSetChanged();
+        SugarRecord.save(address);
+
+
+    }
 
     @Override
     protected void onStart() {
@@ -275,6 +350,16 @@ public class MainActivity extends AppCompatActivity {
             throw new RuntimeException(exception);
         }
 
+    }
+
+    @Override
+    public void onBackPressed() {
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawerLayout);
+        if (drawer.isDrawerOpen(GravityCompat.START)) {
+            drawer.closeDrawer(GravityCompat.START);
+        } else {
+            super.onBackPressed();
+        }
     }
 }
 

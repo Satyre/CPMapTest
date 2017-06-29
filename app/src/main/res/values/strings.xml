@@ -9,4 +9,6 @@
     <string name="select_drop_off">Select drop off address</string>
     <string name="pick_up">Pick up :</string>
     <string name="fr">FR</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
 </resources>

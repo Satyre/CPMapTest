@@ -41,5 +41,6 @@ dependencies {
     }
     compile 'com.mapbox.mapboxsdk:mapbox-android-services:2.2.0-SNAPSHOT'
     compile 'com.mapbox.mapboxsdk:mapbox-android-ui:2.1.2'
+    compile 'com.github.satyan:sugar:1.5'
 
 }
